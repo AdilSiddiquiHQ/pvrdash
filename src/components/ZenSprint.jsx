@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 
-// Synthesize modern success chime using Web Audio API
+// Synthesize modern success chime using Web Audio API + trigger haptics
 const playSuccessSound = () => {
   try {
+    // Trigger double short haptic click on mobile
+    if (navigator.vibrate) {
+      navigator.vibrate([30, 20, 30]);
+    }
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
     const ctx = new AudioContext();
@@ -25,9 +29,13 @@ const playSuccessSound = () => {
   } catch (e) {}
 };
 
-// Synthesize downward DQ sound
+// Synthesize downward DQ sound + trigger haptics
 const playDqSound = () => {
   try {
+    // Trigger single short haptic bump on mobile
+    if (navigator.vibrate) {
+      navigator.vibrate(65);
+    }
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
     const ctx = new AudioContext();
@@ -50,9 +58,13 @@ const playDqSound = () => {
   } catch (e) {}
 };
 
-// Synthesize premium double chime for Whales (Tier 1)
+// Synthesize premium double chime for Whales (Tier 1) + trigger haptics
 const playWhaleSound = () => {
   try {
+    // Trigger triple distinct haptic alert pattern for whales
+    if (navigator.vibrate) {
+      navigator.vibrate([70, 30, 70, 30, 110]);
+    }
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
     const ctx = new AudioContext();
