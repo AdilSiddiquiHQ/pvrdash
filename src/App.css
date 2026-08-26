@@ -1763,3 +1763,25 @@ html, body {
     padding: 0.4rem 0.6rem;
   }
 }
+
+/* Stacked layout buttons inside Zen Sprint Mode */
+.zen-mobile-controls.stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.zen-mobile-controls.stacked .zen-action-btn {
+  width: 100%;
+}
+
+.zen-action-btn.mail-blue {
+  background: linear-gradient(135deg, var(--color-blue) 0%, rgba(6, 182, 212, 0.7) 100%);
+  color: #000;
+  box-shadow: 0 4px 15px rgba(6, 182, 212, 0.2);
+}
+
+.zen-action-btn.mail-blue:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(6, 182, 212, 0.35);
+}

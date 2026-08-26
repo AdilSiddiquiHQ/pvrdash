@@ -50,6 +50,35 @@ const playDqSound = () => {
   } catch (e) {}
 };
 
+// Synthesize premium double chime for Whales (Tier 1)
+const playWhaleSound = () => {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    
+    const playChime = (frequency, delay, duration) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      const now = ctx.currentTime + delay;
+      osc.frequency.setValueAtTime(frequency, now);
+      
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      
+      osc.start(now);
+      osc.stop(now + duration);
+    };
+    
+    playChime(880, 0, 0.25); // A5 note
+    playChime(1318.51, 0.08, 0.35); // E6 note
+  } catch (e) {}
+};
+
 export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -150,7 +179,14 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
     setTimeout(() => setCopied(false), 1500);
   };
 
-  // Auto-copy lead copy to clipboard on load
+  // Trigger Whale Alert sound if the card loads is a Tier 1 Whale
+  useEffect(() => {
+    if (activeLead && activeLead.lead_tier.includes('Tier 1')) {
+      playWhaleSound();
+    }
+  }, [currentIndex, activeLead]);
+
+  // Auto-copy active channel script to clipboard on load
   useEffect(() => {
     if (activeLead) {
       const activePitch = activeChannel === 'ig' ? activeLead.mobile_dm_pitch : activeLead.email_body_pitch;
@@ -237,7 +273,7 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
     }
   };
 
-  // Keyboard navigation listeners (Space, Enter, R for Replied, B for Booked)
+  // Keyboard navigation listeners (Space for action, Enter/D for Done/Next, M for email action)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!activeLead) return;
@@ -251,9 +287,24 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
 
       if (e.code === 'Space') {
         e.preventDefault();
-        executeAction();
-      } else if (e.code === 'Enter') {
+        // Trigger DM copy & open
+        const igUrl = getInstagramDMUrl(activeLead.raw_instagram_handle, activeLead.instagram_profile_url);
+        if (igUrl) {
+          handleDMAction(igUrl, activeLead.mobile_dm_pitch, 'Instagram');
+        }
+      } else if (key === 'm') {
         e.preventDefault();
+        // Trigger Email copy & mailto draft
+        if (activeLead.direct_founder_email) {
+          handleEmailAction(activeLead.direct_founder_email, activeLead.email_subject_line, activeLead.email_body_pitch);
+        }
+      } else if (e.code === 'Enter' || key === 'd') {
+        e.preventDefault();
+        executeDone();
+      } else if (key === 'q') {
+        e.preventDefault();
+        onStatusUpdate(activeLead, 'Disqualified');
+        playDqSound();
         executeDone();
       } else if (key === 'r') {
         e.preventDefault();
@@ -319,6 +370,8 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
   const targetGoal = 30;
   const sprintPercentage = Math.min(100, (currentIndex / targetGoal) * 100);
 
+  const igUrl = getInstagramDMUrl(activeLead.raw_instagram_handle, activeLead.instagram_profile_url);
+
   return (
     <div className="zen-sprint-container">
       {/* Header controls with Goal Ring Progress */}
@@ -341,14 +394,14 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
             className={`channel-tab-btn ${activeChannel === 'ig' ? 'active' : ''}`}
             onClick={() => setActiveChannel('ig')}
           >
-            📸 DM Pitch
+            📸 DM Preview
           </button>
           {activeLead.direct_founder_email && (
             <button 
               className={`channel-tab-btn ${activeChannel === 'email' ? 'active' : ''}`}
               onClick={() => setActiveChannel('email')}
             >
-              ✉️ Email Pitch
+              ✉️ Email Preview
             </button>
           )}
         </div>
@@ -394,21 +447,39 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
               <span className="vertical-label">📁 {activeLead.mentorship_vertical.split(' Mentors')[0]}</span>
             </div>
 
-            {/* Large Mobile-Friendly Actions row */}
-            <div className="zen-mobile-controls">
-              <button className="zen-action-btn primary" onClick={executeAction}>
-                <span className="btn-icon">📲</span>
-                <div className="btn-text-container">
-                  <strong>Copy & Open {activeChannel === 'ig' ? 'DM' : 'Email'}</strong>
-                  <small>Press Space (Desktop)</small>
-                </div>
-              </button>
+            {/* Three Large Visible Actions Rows (Instagram DM, Direct Email, Sent Confirmation) */}
+            <div className="zen-mobile-controls stacked">
+              {igUrl && (
+                <button 
+                  className="zen-action-btn primary" 
+                  onClick={() => handleDMAction(igUrl, activeLead.mobile_dm_pitch, 'Instagram')}
+                >
+                  <span className="btn-icon">📲</span>
+                  <div className="btn-text-container">
+                    <strong>Copy & Open Instagram DM</strong>
+                    <small>Press Space (Desktop)</small>
+                  </div>
+                </button>
+              )}
+
+              {activeLead.direct_founder_email && (
+                <button 
+                  className="zen-action-btn mail-blue" 
+                  onClick={() => handleEmailAction(activeLead.direct_founder_email, activeLead.email_subject_line, activeLead.email_body_pitch)}
+                >
+                  <span className="btn-icon">✉️</span>
+                  <div className="btn-text-container">
+                    <strong>Copy & Draft Direct Email</strong>
+                    <small>Press M (Desktop)</small>
+                  </div>
+                </button>
+              )}
 
               <button className="zen-action-btn success" onClick={executeDone}>
                 <span className="btn-icon">➔</span>
                 <div className="btn-text-container">
-                  <strong>Mark Outreach Sent</strong>
-                  <small>Press Enter (Desktop)</small>
+                  <strong>Mark Outreach Sent & Next</strong>
+                  <small>Press Enter / D (Desktop)</small>
                 </div>
               </button>
             </div>
