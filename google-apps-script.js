@@ -14,8 +14,13 @@
 
 function doGet(e) {
   // CORS Bypass: Allow GET requests to perform updates to avoid redirect CORS issues in browsers
-  if (e && e.parameter && e.parameter.action === 'update') {
-    return handleUpdate(e.parameter);
+  if (e && e.parameter) {
+    if (e.parameter.action === 'update') {
+      return handleUpdate(e.parameter);
+    }
+    if (e.parameter.action === 'reset') {
+      return handleReset();
+    }
   }
   
   return handleRead();
@@ -167,5 +172,32 @@ function formatDateTime(dateObj) {
     return String(dateObj);
   } catch (e) {
     return String(dateObj);
+  }
+}
+
+function handleReset() {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Master Outreach CRM") || SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var lastRow = sheet.getLastRow();
+    
+    if (lastRow > 1) {
+      for (var i = 2; i <= lastRow; i++) {
+        sheet.getRange(i, 28).setValue("Phase 1"); // Column AB (outreach_status)
+        sheet.getRange(i, 29).setValue("");        // Column AC (last_action_by)
+        sheet.getRange(i, 30).setValue("");        // Column AD (last_action_at)
+      }
+    }
+    
+    var response = JSON.stringify({ 
+      status: "success", 
+      message: "Sheet reset back to Phase 1 successfully!" 
+    });
+    
+    return ContentService.createTextOutput(response)
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
