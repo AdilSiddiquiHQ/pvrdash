@@ -37,7 +37,7 @@ function doPost(e) {
 
 function handleRead() {
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Master Outreach CRM") || SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     var data = sheet.getDataRange().getValues();
     var rows = [];
     
@@ -98,7 +98,7 @@ function handleUpdate(params) {
     var sentBy = params.sent_by;
     var timestamp = new Date().toISOString();
     
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Master Outreach CRM") || SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     var targetRow = -1;
     
     if (rowIndex) {
