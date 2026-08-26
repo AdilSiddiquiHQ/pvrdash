@@ -150,14 +150,25 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
     };
   };
 
-  // Sort Sprint leads: 1. Overdue Follow-ups first, 2. Whale Tier 1 next
+  // Sort and filter Sprint leads:
+  // 1. Only include:
+  //    - Leads in Phase 1 (new cold leads that haven't been messaged yet).
+  //    - Leads in Phase 2, 3, 4, or 5 that are OVERDUE/DUE for follow-up.
   const sprintLeads = leads
-    .filter(lead => ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'].includes(lead.outreach_status))
+    .filter(lead => {
+      if (lead.outreach_status === 'Phase 1') return true;
+      if (['Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'].includes(lead.outreach_status)) {
+        return checkLeadDue(lead);
+      }
+      return false;
+    })
     .sort((a, b) => {
+      // 1. Due follow-up leads go first (Phase 2-5 due)
       const aDue = checkLeadDue(a) ? 1 : 0;
       const bDue = checkLeadDue(b) ? 1 : 0;
       if (bDue !== aDue) return bDue - aDue;
       
+      // 2. Whale Tier 1 leads go next
       const aWhale = a.lead_tier.includes('Tier 1') ? 1 : 0;
       const bWhale = b.lead_tier.includes('Tier 1') ? 1 : 0;
       return bWhale - aWhale;
