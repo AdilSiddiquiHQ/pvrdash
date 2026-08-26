@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // Synthesize modern success chime using Web Audio API + trigger haptics
-const playSuccessSound = () => {
+const playSuccessSound = (volume = 0.5) => {
   try {
-    // Trigger double short haptic click on mobile
     if (navigator.vibrate) {
       navigator.vibrate([30, 20, 30]);
     }
@@ -21,7 +20,7 @@ const playSuccessSound = () => {
     osc.frequency.setValueAtTime(587.33, now); // D5 Note
     osc.frequency.exponentialRampToValueAtTime(880, now + 0.15); // A5 Note
     
-    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.setValueAtTime(0.12 * volume, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
     
     osc.start(now);
@@ -30,9 +29,8 @@ const playSuccessSound = () => {
 };
 
 // Synthesize downward DQ sound + trigger haptics
-const playDqSound = () => {
+const playDqSound = (volume = 0.5) => {
   try {
-    // Trigger single short haptic bump on mobile
     if (navigator.vibrate) {
       navigator.vibrate(65);
     }
@@ -50,7 +48,7 @@ const playDqSound = () => {
     osc.frequency.setValueAtTime(440, now); // A4
     osc.frequency.exponentialRampToValueAtTime(220, now + 0.18); // A3 (slide down)
     
-    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.setValueAtTime(0.1 * volume, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
     
     osc.start(now);
@@ -59,9 +57,8 @@ const playDqSound = () => {
 };
 
 // Synthesize premium double chime for Whales (Tier 1) + trigger haptics
-const playWhaleSound = () => {
+const playWhaleSound = (volume = 0.5) => {
   try {
-    // Trigger triple distinct haptic alert pattern for whales
     if (navigator.vibrate) {
       navigator.vibrate([70, 30, 70, 30, 110]);
     }
@@ -79,7 +76,7 @@ const playWhaleSound = () => {
       const now = ctx.currentTime + delay;
       osc.frequency.setValueAtTime(frequency, now);
       
-      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.setValueAtTime(0.08 * volume, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
       
       osc.start(now);
@@ -92,101 +89,114 @@ const playWhaleSound = () => {
 };
 
 export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClose }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // Session Resume Memory: Restore previous sprint card index if valid
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    const cachedIndex = localStorage.getItem('zen_sprint_index');
+    return cachedIndex ? parseInt(cachedIndex, 10) : 0;
+  });
+
   const [copied, setCopied] = useState(false);
   const [copyText, setCopyText] = useState("");
   const [activeChannel, setActiveChannel] = useState("ig"); // 'ig' or 'email'
   
-  // Touch gestures swipe states
+  // Dual-Channel Auto-Flow Step: 1 = IG DM, 2 = Email compose
+  const [subStep, setSubStep] = useState(1);
+  const [autoLaunch, setAutoLaunch] = useState(false); // Off by default for safety, easily toggled
+
+  // Volumetric Audio Controller
+  const [audioVolume, setAudioVolume] = useState(() => {
+    const cachedVol = localStorage.getItem('zen_sprint_volume');
+    return cachedVol ? parseFloat(cachedVol) : 0.5;
+  });
+
+  // Swipe gesture configuration
+  const [swipeThreshold, setSwipeThreshold] = useState(() => {
+    const cachedThreshold = localStorage.getItem('zen_swipe_threshold');
+    return cachedThreshold ? parseInt(cachedThreshold, 10) : 80;
+  });
+
+  // Horizontal Speed Countdown states (15 seconds)
+  const [timeLeft, setTimeLeft] = useState(15);
+  
+  // Touch gestures states
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
 
-  // Helper to check follow-up due status
-  const checkLeadDue = (lead) => {
-    if (!lead.last_action_at) return false;
-    const lastActionDate = new Date(lead.last_action_at);
-    const now = new Date();
-    const elapsedHrs = (now - lastActionDate) / (1000 * 60 * 60);
-    
-    switch (lead.outreach_status) {
-      case 'Phase 1':
-      case 'Phase 2':
-      case 'Phase 3':
-        return elapsedHrs >= 48;
-      case 'Phase 4':
-        return elapsedHrs >= 168;
-      default:
-        return false;
-    }
-  };
+  // Skip state for focus listeners to prevent loop double-triggers
+  const launchRef = useRef(false);
 
-  // Estimate lead timezone/local time and output best outreach advice
-  const getLeadLocalTime = (email) => {
-    let offset = -5; // Default US Eastern Time (UTC -5)
-    let timezoneLabel = "US Eastern (EST)";
-    
-    if (email) {
-      const emailLower = email.toLowerCase().trim();
-      if (emailLower.endsWith('.uk') || emailLower.endsWith('.co.uk')) {
-        offset = 0; // London GMT/BST
-        timezoneLabel = "United Kingdom (GMT/BST)";
-      } else if (emailLower.endsWith('.au')) {
-        offset = 10; // Sydney AEST
-        timezoneLabel = "Australia (AEST)";
-      } else if (emailLower.endsWith('.ca')) {
-        offset = -5; // Canada EST
-        timezoneLabel = "Canada (EST)";
-      }
-    }
-    
-    const utc = new Date().getTime() + new Date().getTimezoneOffset() * 60000;
-    const localTime = new Date(utc + 3600000 * offset);
-    const hours = localTime.getHours();
-    
-    let windowState = "🟢 High Reply Window (Active Hours)";
-    let level = "high";
-    
-    if (hours >= 22 || hours < 7) {
-      windowState = "🔴 Low Reply Window (Creator Sleeping)";
-      level = "low";
-    } else if (hours >= 18 || hours < 9) {
-      windowState = "🟡 Medium Reply Window (After-Hours)";
-      level = "medium";
-    }
-    
-    return {
-      timeStr: localTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      timezoneLabel,
-      windowState,
-      level
-    };
-  };
-
-  // Sort and filter Sprint leads:
-  // 1. Only include:
-  //    - Leads in Phase 1 (new cold leads that haven't been messaged yet).
-  //    - Leads in Phase 2, 3, 4, or 5 that are OVERDUE/DUE for follow-up.
+  // 1. Filter out leads with missing coordinates to prevent workflow locks
   const sprintLeads = leads
     .filter(lead => {
+      // Must have at least one channel to message
+      if (!lead.instagram_profile_url && !lead.direct_founder_email) return false;
+      
       if (lead.outreach_status === 'Phase 1') return true;
       if (['Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'].includes(lead.outreach_status)) {
-        return checkLeadDue(lead);
+        // Dynamic helper to check if due
+        if (!lead.last_action_at) return false;
+        const lastActionDate = new Date(lead.last_action_at);
+        const now = new Date();
+        const elapsedHrs = (now - lastActionDate) / (1000 * 60 * 60);
+        
+        switch (lead.outreach_status) {
+          case 'Phase 2':
+          case 'Phase 3':
+            return elapsedHrs >= 48;
+          case 'Phase 4':
+            return elapsedHrs >= 168;
+          default:
+            return false;
+        }
       }
       return false;
     })
     .sort((a, b) => {
-      // 1. Due follow-up leads go first (Phase 2-5 due)
-      const aDue = checkLeadDue(a) ? 1 : 0;
-      const bDue = checkLeadDue(b) ? 1 : 0;
-      if (bDue !== aDue) return bDue - aDue;
-      
-      // 2. Whale Tier 1 leads go next
+      // Sort Whale Tier 1 leads first
       const aWhale = a.lead_tier.includes('Tier 1') ? 1 : 0;
       const bWhale = b.lead_tier.includes('Tier 1') ? 1 : 0;
       return bWhale - aWhale;
     });
 
   const activeLead = sprintLeads[currentIndex];
+
+  // Sync index to local storage to enable Session Resume
+  useEffect(() => {
+    localStorage.setItem('zen_sprint_index', currentIndex.toString());
+  }, [currentIndex]);
+
+  // Sync swipe sensitivity calibration
+  useEffect(() => {
+    localStorage.setItem('zen_swipe_threshold', swipeThreshold.toString());
+  }, [swipeThreshold]);
+
+  // Sync volume controller
+  useEffect(() => {
+    localStorage.setItem('zen_sprint_volume', audioVolume.toString());
+  }, [audioVolume]);
+
+  // Trigger Whale Alert chime on Tier 1 load
+  useEffect(() => {
+    if (activeLead && activeLead.lead_tier.includes('Tier 1')) {
+      playWhaleSound(audioVolume);
+    }
+  }, [currentIndex, activeLead]);
+
+  // 15-second horizontal countdown timer
+  useEffect(() => {
+    setTimeLeft(15);
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [currentIndex, subStep]);
 
   // Helper to construct ig.me direct DM links
   const getInstagramDMUrl = (handle, profileUrl) => {
@@ -202,33 +212,9 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
     setTimeout(() => setCopied(false), 1500);
   };
 
-  // Trigger Whale Alert sound if the card loads is a Tier 1 Whale
-  useEffect(() => {
-    if (activeLead && activeLead.lead_tier.includes('Tier 1')) {
-      playWhaleSound();
-    }
-  }, [currentIndex, activeLead]);
-
-  // Auto-copy active channel script to clipboard on load
-  useEffect(() => {
-    if (activeLead) {
-      const activePitch = activeChannel === 'ig' ? activeLead.mobile_dm_pitch : activeLead.email_body_pitch;
-      if (activePitch) {
-        navigator.clipboard.writeText(activePitch)
-          .then(() => {
-            setCopyText(`Auto-copied ${activeChannel === 'ig' ? 'DM' : 'Email'}`);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1200);
-          })
-          .catch(() => {});
-      }
-    }
-  }, [currentIndex, activeChannel]);
-
-  // Direct DM outreach handler
-  const handleDMAction = (url, pitchText, type) => {
+  const handleDMAction = (url, pitchText) => {
     if (!url) return;
-    handleCopy(pitchText, `${type} Pitch`);
+    handleCopy(pitchText, "Instagram Pitch");
     window.open(url, '_blank');
   };
 
@@ -240,63 +226,104 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
     window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
   };
 
-  // Determine next status state
-  const getNextStatus = (status) => {
-    switch (status) {
-      case 'Phase 1': return 'Phase 2';
-      case 'Phase 2': return 'Phase 3';
-      case 'Phase 3': return 'Phase 4';
-      case 'Phase 4': return 'Phase 5';
-      case 'Phase 5': return 'Phase 6';
-      default: return null;
-    }
-  };
-
-  const executeAction = () => {
-    if (!activeLead) return;
-    
-    if (activeChannel === 'ig') {
-      const igUrl = getInstagramDMUrl(activeLead.raw_instagram_handle, activeLead.instagram_profile_url);
-      if (igUrl) {
-        handleDMAction(igUrl, activeLead.mobile_dm_pitch, 'Instagram');
-      } else if (activeLead.twitter_x_url) {
-        handleDMAction(activeLead.twitter_x_url, activeLead.mobile_dm_pitch, 'Twitter/X');
-      }
-    } else {
-      handleEmailAction(activeLead.direct_founder_email, activeLead.email_subject_line, activeLead.email_body_pitch);
-    }
-  };
-
+  // Dual-channel sequencing trigger
   const executeDone = () => {
     if (!activeLead) return;
-    const nextStatus = getNextStatus(activeLead.outreach_status);
-    if (nextStatus) {
-      onStatusUpdate(activeLead, nextStatus);
-      playSuccessSound();
-    }
     
-    // Auto-advance
+    // Play success sound
+    playSuccessSound(audioVolume);
+    
+    // Determine next phase status
+    const getNextStatus = (status) => {
+      switch (status) {
+        case 'Phase 1': return 'Phase 2';
+        case 'Phase 2': return 'Phase 3';
+        case 'Phase 3': return 'Phase 4';
+        case 'Phase 4': return 'Phase 5';
+        default: return 'Phase 6';
+      }
+    };
+
+    const nextStatus = getNextStatus(activeLead.outreach_status);
+    onStatusUpdate(activeLead, nextStatus);
+
+    // Reset sub-step and load next lead
+    setSubStep(1);
+    launchRef.current = false;
+    
     const nextIndex = currentIndex + 1;
     if (nextIndex < sprintLeads.length) {
       setCurrentIndex(nextIndex);
-      // Pre-copy the next pitch automatically
-      const nextLead = sprintLeads[nextIndex];
-      const nextPitch = activeChannel === 'ig' ? nextLead.mobile_dm_pitch : nextLead.email_body_pitch;
-      if (nextPitch) {
-        navigator.clipboard.writeText(nextPitch)
-          .then(() => {
-            setCopyText(`Auto-copied Next ${activeChannel === 'ig' ? 'DM' : 'Email'}`);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1200);
-          })
-          .catch(() => {});
-      }
     } else {
+      localStorage.removeItem('zen_sprint_index');
       setCurrentIndex(nextIndex);
     }
   };
 
-  // Keyboard navigation listeners (Space for action, Enter/D for Done/Next, M for email action)
+  // Direct composition trigger based on current step
+  const executeStepLaunch = () => {
+    if (!activeLead) return;
+    launchRef.current = true;
+    
+    if (subStep === 1) {
+      const igUrl = getInstagramDMUrl(activeLead.raw_instagram_handle, activeLead.instagram_profile_url);
+      if (igUrl) {
+        handleDMAction(igUrl, activeLead.mobile_dm_pitch);
+      } else {
+        // Fallback to Email immediately if no IG
+        setSubStep(2);
+      }
+    } else {
+      if (activeLead.direct_founder_email) {
+        handleEmailAction(activeLead.direct_founder_email, activeLead.email_subject_line, activeLead.email_body_pitch);
+      } else {
+        executeDone();
+      }
+    }
+  };
+
+  // Tab refocus listener to automate Dual-Channel transition
+  useEffect(() => {
+    const handleFocus = () => {
+      if (!activeLead || !launchRef.current) return;
+      
+      // User just returned from sending!
+      if (subStep === 1) {
+        // If lead has an email, move to Step 2 (Email)
+        if (activeLead.direct_founder_email) {
+          setSubStep(2);
+          launchRef.current = false;
+          if (autoLaunch) {
+            setTimeout(() => {
+              handleEmailAction(activeLead.direct_founder_email, activeLead.email_subject_line, activeLead.email_body_pitch);
+              launchRef.current = true;
+            }, 600);
+          }
+        } else {
+          // No email, outreach complete!
+          executeDone();
+        }
+      } else if (subStep === 2) {
+        // Email sent, advance to next lead!
+        executeDone();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [currentIndex, subStep, activeLead, autoLaunch, audioVolume]);
+
+  // Auto-launch the first channel (IG) on card mount
+  useEffect(() => {
+    if (activeLead && autoLaunch && subStep === 1) {
+      const timer = setTimeout(() => {
+        executeStepLaunch();
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [currentIndex, autoLaunch]);
+
+  // Keyboard navigation listeners
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!activeLead) return;
@@ -310,43 +337,24 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
 
       if (e.code === 'Space') {
         e.preventDefault();
-        // Trigger DM copy & open
-        const igUrl = getInstagramDMUrl(activeLead.raw_instagram_handle, activeLead.instagram_profile_url);
-        if (igUrl) {
-          handleDMAction(igUrl, activeLead.mobile_dm_pitch, 'Instagram');
-        }
-      } else if (key === 'm') {
-        e.preventDefault();
-        // Trigger Email copy & mailto draft
-        if (activeLead.direct_founder_email) {
-          handleEmailAction(activeLead.direct_founder_email, activeLead.email_subject_line, activeLead.email_body_pitch);
-        }
+        executeStepLaunch();
       } else if (e.code === 'Enter' || key === 'd') {
         e.preventDefault();
         executeDone();
       } else if (key === 'q') {
         e.preventDefault();
         onStatusUpdate(activeLead, 'Disqualified');
-        playDqSound();
-        executeDone();
-      } else if (key === 'r') {
-        e.preventDefault();
-        onStatusUpdate(activeLead, 'Replied');
-        playSuccessSound();
-        executeDone();
-      } else if (key === 'b') {
-        e.preventDefault();
-        onStatusUpdate(activeLead, 'Call Booked');
-        playSuccessSound();
-        executeDone();
+        playDqSound(audioVolume);
+        setSubStep(1);
+        setCurrentIndex(prev => prev + 1);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIndex, activeLead, activeChannel, sprintLeads]);
+  }, [currentIndex, subStep, activeLead, audioVolume]);
 
-  // Touch Swipe Gesture Handlers
+  // Touch Swipe gestures logic
   const handleTouchStart = (e) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
@@ -359,16 +367,17 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
     const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 70;
-    const isRightSwipe = distance < -70;
+    const isLeftSwipe = distance > swipeThreshold;
+    const isRightSwipe = distance < -swipeThreshold;
 
     if (isLeftSwipe) {
       // Swipe Left = DQ
       onStatusUpdate(activeLead, 'Disqualified');
-      playDqSound();
-      executeDone();
+      playDqSound(audioVolume);
+      setSubStep(1);
+      setCurrentIndex(prev => prev + 1);
     } else if (isRightSwipe) {
-      // Swipe Right = Sent / Done
+      // Swipe Right = Skip / Done
       executeDone();
     }
   };
@@ -385,22 +394,60 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
     );
   }
 
-  const nextStatus = getNextStatus(activeLead.outreach_status);
-  const isDue = checkLeadDue(activeLead);
-  const timezoneInfo = getLeadLocalTime(activeLead.direct_founder_email);
-
-  // Calculate goal progress for current session target (30)
+  const isTier1 = activeLead.lead_tier.includes('Tier 1');
   const targetGoal = 30;
   const sprintPercentage = Math.min(100, (currentIndex / targetGoal) * 100);
 
+  // Timezone localized advice
+  const getLeadLocalTime = (email) => {
+    let offset = -5;
+    let label = "US Eastern (EST)";
+    if (email) {
+      const emailLower = email.toLowerCase().trim();
+      if (emailLower.endsWith('.uk') || emailLower.endsWith('.co.uk')) {
+        offset = 0;
+        label = "United Kingdom (GMT)";
+      } else if (emailLower.endsWith('.au')) {
+        offset = 10;
+        label = "Australia (AEST)";
+      }
+    }
+    const utc = new Date().getTime() + new Date().getTimezoneOffset() * 60000;
+    const localTime = new Date(utc + 3600000 * offset);
+    const hrs = localTime.getHours();
+    let advice = "🟢 High Reply Window";
+    let type = "high";
+    if (hrs >= 22 || hrs < 7) {
+      advice = "🔴 Creator Sleeping";
+      type = "low";
+    } else if (hrs >= 18 || hrs < 9) {
+      advice = "🟡 After-Hours";
+      type = "medium";
+    }
+    return {
+      timeStr: localTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      label,
+      advice,
+      type
+    };
+  };
+
+  const timezoneInfo = getLeadLocalTime(activeLead.direct_founder_email);
   const igUrl = getInstagramDMUrl(activeLead.raw_instagram_handle, activeLead.instagram_profile_url);
 
   return (
     <div className="zen-sprint-container">
+      {/* 15-second horizontal speed countdown bar */}
+      <div className="speed-countdown-container">
+        <div 
+          className={`speed-countdown-fill ${timeLeft <= 4 ? 'critical' : ''}`}
+          style={{ width: `${(timeLeft / 15) * 100}%` }}
+        />
+      </div>
+
       {/* Header controls with Goal Ring Progress */}
       <div className="zen-header">
         <div className="zen-progress">
-          {/* Daily Goal Ring SVG */}
           <div className="goal-ring-wrapper" title={`Daily progress: ${currentIndex} / ${targetGoal} sent`}>
             <svg width="28" height="28" viewBox="0 0 36 36" className="goal-ring-svg">
               <path className="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
@@ -408,92 +455,94 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
             </svg>
             <span className="goal-ring-text">{currentIndex}</span>
           </div>
-          <span>Sprint &bull; Lead <strong>{currentIndex + 1}</strong> of <strong>{sprintLeads.length}</strong></span>
+          <span>Lead <strong>{currentIndex + 1}</strong> of <strong>{sprintLeads.length}</strong></span>
         </div>
 
-        {/* Channel Switcher */}
-        <div className="zen-channel-switcher">
-          <button 
-            className={`channel-tab-btn ${activeChannel === 'ig' ? 'active' : ''}`}
-            onClick={() => setActiveChannel('ig')}
-          >
-            📸 DM Preview
-          </button>
-          {activeLead.direct_founder_email && (
-            <button 
-              className={`channel-tab-btn ${activeChannel === 'email' ? 'active' : ''}`}
-              onClick={() => setActiveChannel('email')}
-            >
-              ✉️ Email Preview
-            </button>
-          )}
+        {/* Dynamic Step Flow Visual Indicator */}
+        <div className="dual-step-indicator">
+          <span className={`step-badge ${subStep === 1 ? 'active' : 'done'}`}>Step 1: 📸 IG DM</span>
+          <span className="arrow-sep">➔</span>
+          <span className={`step-badge ${subStep === 2 ? 'active' : ''} ${!activeLead.direct_founder_email ? 'disabled' : ''}`}>Step 2: ✉️ Email</span>
         </div>
 
-        <button className="zen-close-btn" onClick={onClose}>✕ Exit Zen</button>
+        {/* Volumetric Audio Slider & Auto-Launch controls */}
+        <div className="header-controls-group">
+          <div className="volume-slider-container" title="Adjust success sound volume">
+            <span>🔊</span>
+            <input 
+              type="range" 
+              min="0" 
+              max="1" 
+              step="0.1" 
+              value={audioVolume}
+              onChange={(e) => setAudioVolume(parseFloat(e.target.value))}
+            />
+          </div>
+
+          <label className="toggle-label" title="Automatically copy and launch DMs/Emails">
+            <input 
+              type="checkbox" 
+              checked={autoLaunch} 
+              onChange={(e) => setAutoLaunch(e.target.checked)} 
+            />
+            <span>Auto-Launch</span>
+          </label>
+
+          <button className="zen-close-btn" onClick={onClose}>✕ Close</button>
+        </div>
       </div>
 
       <div className="zen-content-grid">
         {/* Left Side: Active Card console */}
         <div className="zen-active-pane">
           <div 
-            className={`zen-card ${isDue ? 'due-highlight' : ''}`}
+            className={`zen-card ${isTier1 ? 'whale-glow' : ''}`}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
-            {isDue && (
-              <div className="due-banner">
-                🚨 Follow-Up Overdue
-              </div>
-            )}
-
             <div className="zen-card-header">
               <div>
                 <h2>{activeLead.brand_or_channel_name}</h2>
                 <span className="zen-founder">👤 {activeLead.founder_name || 'Unknown'}</span>
               </div>
-              <span className={`tier-badge ${activeLead.lead_tier.includes('Tier 1') ? 'tier-1' : activeLead.lead_tier.includes('Tier 2') ? 'tier-2' : 'tier-3'}`}>
-                {activeLead.lead_tier.includes('Tier 1') ? 'Whale' : activeLead.lead_tier.includes('Tier 2') ? 'Core' : 'Emerg'}
+              <span className={`tier-badge ${isTier1 ? 'tier-1' : 'tier-2'}`}>
+                {isTier1 ? 'Whale' : 'Core'}
               </span>
             </div>
 
             {/* Smart Local Time Zone Advisory Banner */}
-            <div className={`timezone-badge ${timezoneInfo.level}`}>
-              🕒 {timezoneInfo.timezoneLabel} Time: <strong>{timezoneInfo.timeStr}</strong> &bull; {timezoneInfo.windowState}
+            <div className={`timezone-badge ${timezoneInfo.type}`}>
+              🕒 {timezoneInfo.label} Time: <strong>{timezoneInfo.timeStr}</strong> &bull; {timezoneInfo.advice}
             </div>
 
             <div className="badge-row">
               <span className="compact-badge wvp">💎 {activeLead.wvp_status.includes('Passed') ? 'WVP' : 'Std'}</span>
-              {activeLead.direct_founder_email && (
-                <span className="compact-badge email-direct">✉️ {activeLead.email_domain_type.split(' ')[0]}</span>
-              )}
               <span className="vertical-label">📁 {activeLead.mentorship_vertical.split(' Mentors')[0]}</span>
             </div>
 
-            {/* Three Large Visible Actions Rows (Instagram DM, Direct Email, Sent Confirmation) */}
+            {/* Primary Action Sequence Buttons */}
             <div className="zen-mobile-controls stacked">
-              {igUrl && (
+              {subStep === 1 ? (
                 <button 
                   className="zen-action-btn primary" 
-                  onClick={() => handleDMAction(igUrl, activeLead.mobile_dm_pitch, 'Instagram')}
+                  onClick={executeStepLaunch}
                 >
                   <span className="btn-icon">📲</span>
                   <div className="btn-text-container">
                     <strong>Copy & Open Instagram DM</strong>
-                    <small>Press Space (Desktop)</small>
+                    <small>Step 1 &bull; Press Space (Desktop)</small>
                   </div>
                 </button>
-              )}
-
-              {activeLead.direct_founder_email && (
+              ) : (
                 <button 
                   className="zen-action-btn mail-blue" 
-                  onClick={() => handleEmailAction(activeLead.direct_founder_email, activeLead.email_subject_line, activeLead.email_body_pitch)}
+                  onClick={executeStepLaunch}
                 >
                   <span className="btn-icon">✉️</span>
                   <div className="btn-text-container">
                     <strong>Copy & Draft Direct Email</strong>
-                    <small>Press M (Desktop)</small>
+                    <small>Step 2 &bull; Press Space (Desktop)</small>
                   </div>
                 </button>
               )}
@@ -507,21 +556,26 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
               </button>
             </div>
 
-            <div className="mobile-swipe-indicator">
-              <span>← Swipe Left to DQ</span>
-              <span>Swipe Right to Send →</span>
+            {/* Mobile swipe threshold calibration settings */}
+            <div className="swipe-calibration-control">
+              <label>Swipe Sensitivity:</label>
+              <input 
+                type="range" 
+                min="40" 
+                max="180" 
+                value={swipeThreshold} 
+                onChange={(e) => setSwipeThreshold(parseInt(e.target.value, 10))} 
+              />
+              <span>{swipeThreshold}px</span>
             </div>
 
             {/* Quick transition footer options */}
             <div className="zen-footer-row">
-              <button className="footer-btn dq" onClick={() => { onStatusUpdate(activeLead, 'Disqualified'); playDqSound(); executeDone(); }} title="Hotkey: Q">
+              <button className="footer-btn dq" onClick={() => { onStatusUpdate(activeLead, 'Disqualified'); playDqSound(audioVolume); setSubStep(1); setCurrentIndex(prev => prev + 1); }} title="Hotkey: Q">
                 ❌ Disqualify <kbd className="shortcut-cap inline">Q</kbd>
               </button>
-              <button className="footer-btn replied" onClick={() => { onStatusUpdate(activeLead, 'Replied'); playSuccessSound(); executeDone(); }} title="Hotkey: R">
-                💬 Replied <kbd className="shortcut-cap inline">R</kbd>
-              </button>
-              <button className="footer-btn booked" onClick={() => { onStatusUpdate(activeLead, 'Call Booked'); playSuccessSound(); executeDone(); }} title="Hotkey: B">
-                🤝 Booked <kbd className="shortcut-cap inline">B</kbd>
+              <button className="footer-btn skip" onClick={() => { setSubStep(1); setCurrentIndex(prev => prev + 1); }}>
+                ⏭️ Skip
               </button>
             </div>
           </div>
@@ -529,15 +583,22 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
           {/* Quick-edit pitch window */}
           <div className="zen-pitch-box">
             <div className="pitch-preview-header">
-              <span>Active Outreach Script ({activeChannel === 'ig' ? 'DM' : 'Email'})</span>
-              <button onClick={() => handleCopy(activeChannel === 'ig' ? activeLead.mobile_dm_pitch : activeLead.email_body_pitch, 'Pitch')}>Copy Script</button>
+              <span>Active Script ({subStep === 1 ? 'DM' : 'Email'})</span>
+              {/* Floating Copyable Bubble */}
+              <button 
+                className="floating-copy-bubble"
+                onClick={() => handleCopy(subStep === 1 ? activeLead.mobile_dm_pitch : activeLead.email_body_pitch, 'Pitch')}
+                title="Copy current pitch text"
+              >
+                📋 Re-Copy
+              </button>
             </div>
-            {activeChannel === 'email' && activeLead.email_subject_line && (
+            {subStep === 2 && activeLead.email_subject_line && (
               <div className="email-subject-preview">
                 <strong>Subject:</strong> {activeLead.email_subject_line}
               </div>
             )}
-            <pre className="pitch-pre-text">{activeChannel === 'ig' ? activeLead.mobile_dm_pitch : activeLead.email_body_pitch}</pre>
+            <pre className="pitch-pre-text">{subStep === 1 ? activeLead.mobile_dm_pitch : activeLead.email_body_pitch}</pre>
           </div>
         </div>
 

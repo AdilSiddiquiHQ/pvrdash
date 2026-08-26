@@ -1785,3 +1785,189 @@ html, body {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(6, 182, 212, 0.35);
 }
+
+/* ==========================================
+   ⚡ MOBILE SPEED FEATURES CLASS SETS
+   ========================================== */
+
+/* 15s Horizontal Countdown speed bar */
+.speed-countdown-container {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+}
+
+.speed-countdown-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, var(--color-violet) 0%, var(--color-cyan) 100%);
+  transition: width 1s linear;
+}
+
+.speed-countdown-fill.critical {
+  background: linear-gradient(90deg, var(--color-red) 0%, #ff453a 100%);
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.5);
+}
+
+/* Dual step indicators */
+.dual-step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.dual-step-indicator .step-badge {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.dual-step-indicator .step-badge.active {
+  color: var(--color-cyan);
+  text-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+  font-weight: 700;
+}
+
+.dual-step-indicator .step-badge.done {
+  color: var(--color-green);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.dual-step-indicator .step-badge.disabled {
+  opacity: 0.3;
+}
+
+.dual-step-indicator .arrow-sep {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+}
+
+/* Volume Slider & Toggle Header Controls */
+.header-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.volume-slider-container {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.volume-slider-container span {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.volume-slider-container input[type="range"] {
+  width: 70px;
+  height: 3px;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  outline: none;
+}
+
+.volume-slider-container input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  cursor: pointer;
+  border: none;
+}
+
+/* Auto-Launch Toggle */
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-family: var(--font-body);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+  accent-color: var(--color-violet);
+  cursor: pointer;
+}
+
+/* Swipe Sensitivity Slider */
+.swipe-calibration-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 0.5rem 0.8rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.swipe-calibration-control input[type="range"] {
+  flex-grow: 1;
+  margin: 0 0.8rem;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.swipe-calibration-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-cyan);
+  cursor: pointer;
+}
+
+/* Whale Neon Glow border */
+.zen-card.whale-glow {
+  border: 1px solid transparent !important;
+  background: 
+    linear-gradient(var(--bg-card), var(--bg-card)) padding-box,
+    linear-gradient(135deg, var(--color-violet) 0%, var(--color-cyan) 100%) border-box !important;
+  box-shadow: 0 0 25px rgba(94, 106, 210, 0.25) !important;
+  animation: whale-glow-pulse 3s infinite ease-in-out;
+}
+
+@keyframes whale-glow-pulse {
+  0% { box-shadow: 0 0 15px rgba(94, 106, 210, 0.2); }
+  50% { box-shadow: 0 0 30px rgba(94, 106, 210, 0.45); }
+  100% { box-shadow: 0 0 15px rgba(94, 106, 210, 0.2); }
+}
+
+/* Floating re-copy bubble */
+.floating-copy-bubble {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.floating-copy-bubble:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.25);
+}
