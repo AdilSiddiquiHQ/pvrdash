@@ -133,6 +133,9 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
       
       if (lead.outreach_status === 'Phase 1') return true;
       if (['Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'].includes(lead.outreach_status)) {
+        // Ensure this follow-up belongs to the active logged-in founder
+        if (lead.last_action_by !== activeFounder) return false;
+        
         // Dynamic helper to check if due
         if (!lead.last_action_at) return false;
         const lastActionDate = new Date(lead.last_action_at);

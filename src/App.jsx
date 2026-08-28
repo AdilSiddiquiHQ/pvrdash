@@ -350,6 +350,10 @@ export default function App() {
   const getDueFollowUps = (allLeads) => {
     return allLeads.filter(lead => {
       if (!lead.last_action_at) return false;
+      
+      // Filter follow-up tasks to the active claiming founder
+      if (lead.last_action_by !== activeFounder) return false;
+
       const lastActionDate = new Date(lead.last_action_at);
       const now = new Date();
       const elapsedHrs = (now - lastActionDate) / (1000 * 60 * 60);
