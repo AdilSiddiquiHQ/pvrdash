@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { getDynamicPitch } from '../utils/pitchHelper';
+
+const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
 export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
   const [copied, setCopied] = useState(false);
@@ -70,35 +73,51 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
 
   const fuState = getFollowUpStatus();
 
-  // Helper to extract direct link to Instagram DMs (ig.me/m/username)
-  const getInstagramDMUrl = () => {
-    if (!raw_instagram_handle) return instagram_profile_url;
-    // Strip "@" symbol, trailing slashes, or profile paths to get pure handle
-    const username = raw_instagram_handle.replace('@', '').trim().split('/')[0];
-    return `https://ig.me/m/${username}`;
+  const isDmOnly = !direct_founder_email || direct_founder_email.toLowerCase().includes('dm');
+
+  // Helper to extract clean handle
+  const getCleanHandle = () => {
+    let raw = raw_instagram_handle || instagram_profile_url || '';
+    raw = raw.replace(/^(?:https?:\/\/)?(?:www\.)?instagram\.com\//i, '');
+    raw = raw.replace(/^(?:https?:\/\/)?(?:www\.)?ig\.me\/m\//i, '');
+    raw = raw.replace(/@/g, '');
+    return raw.split('/')[0].split('?')[0].trim().replace(/\s+/g, '');
+  };
+
+  const fallbackExecCopy = (text) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.top = '-9999px';
+    textArea.style.left = '-9999px';
+    textArea.setAttribute('readonly', '');
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try { document.execCommand('copy'); } catch (err) { console.error('Fallback copy failed', err); }
+    document.body.removeChild(textArea);
+  };
+
+  // Get email mailto link
+  const getEmailUrl = () => {
+    if (isDmOnly) return '';
+    const emailData = getDynamicPitch(lead, 'email');
+    const subject = encodeURIComponent(emailData.subject || 'quick question');
+    const body = encodeURIComponent(emailData.body || '');
+    return `mailto:${direct_founder_email}?subject=${subject}&body=${body}`;
   };
 
   // Copy helper
-  const handleCopy = (text, label) => {
-    navigator.clipboard.writeText(text);
-    setCopyText(label);
+  const handleCopy = (text, type) => {
+    if (!text) return;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).catch(() => fallbackExecCopy(text));
+    } else {
+      fallbackExecCopy(text);
+    }
     setCopied(true);
+    setCopyText(type);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  // Open profile and copy DM script
-  const handleDMAction = (url, pitchText, type) => {
-    if (!url) return;
-    handleCopy(pitchText, `${type} Pitch`);
-    window.open(url, '_blank');
-  };
-
-  // Open email mailto link
-  const handleEmailAction = () => {
-    if (!direct_founder_email) return;
-    const subject = encodeURIComponent(email_subject_line || 'quick question');
-    const body = encodeURIComponent(email_body_pitch || '');
-    window.open(`mailto:${direct_founder_email}?subject=${subject}&body=${body}`, '_blank');
   };
 
   // Status transition progression
@@ -128,18 +147,21 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
 
       const key = e.key.toLowerCase();
       
-      if (key === 'm' && direct_founder_email) {
+      if (key === 'm' && !isDmOnly) {
         e.preventDefault();
-        handleEmailAction();
+        window.open(getEmailUrl(), '_blank');
       } else if (key === 'i' && instagram_profile_url) {
         e.preventDefault();
-        handleDMAction(getInstagramDMUrl(), mobile_dm_pitch, 'Instagram');
+        handleCopy(getDynamicPitch(lead, 'dm'), 'Instagram Pitch');
+        window.open(isMobileDevice ? `https://ig.me/m/${getCleanHandle()}` : `https://www.instagram.com/${getCleanHandle()}/`, '_blank');
       } else if (key === 'x' && twitter_x_url) {
         e.preventDefault();
-        handleDMAction(twitter_x_url, mobile_dm_pitch, 'Twitter/X');
+        handleCopy(getDynamicPitch(lead, 'dm'), 'Twitter/X Pitch');
+        window.open(twitter_x_url, '_blank');
       } else if (key === 's' && story_swipe_up_hook && instagram_profile_url) {
         e.preventDefault();
-        handleDMAction(getInstagramDMUrl(), story_swipe_up_hook, 'Story Reply');
+        handleCopy(story_swipe_up_hook, 'Story Reply');
+        window.open(isMobileDevice ? `https://ig.me/m/${getCleanHandle()}` : `https://www.instagram.com/${getCleanHandle()}/`, '_blank');
       } else if (key === 'd' || key === 'enter') {
         if (nextStatus) {
           e.preventDefault();
@@ -185,13 +207,17 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
 
       {/* Badges and tags in a single compact row */}
       <div className="badge-row">
+        {isDmOnly && (
+          <span className="compact-badge standard" style={{ background: '#ff1a53', color: 'white' }} title="No email available, DM outreach only">📸 DM Outreach Only</span>
+        )}
+        
         {wvp_status === 'Legitimate Flexer (WVP-Passed)' ? (
           <span className="compact-badge wvp" title="WVP verified luxury creator">💎 WVP</span>
         ) : (
           <span className="compact-badge standard">✓ Std</span>
         )}
         
-        {direct_founder_email && (
+        {!isDmOnly && (
           <>
             {email_domain_type === 'Direct Personal Domain' && (
               <span className="compact-badge email-direct" title="Lands directly in founder inbox">⚡ Direct</span>
@@ -208,50 +234,79 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
         <span className="vertical-label" title={mentorship_vertical}>📁 {mentorship_vertical.split(' Mentors')[0]}</span>
       </div>
 
-      {/* Outreach Action Controls (Compact horizontal icons row with key shortcut hints) */}
+      {/* Outreach Action Controls (Native Anchor Tags for Mobile/PWA Reliability) */}
       <div className="compact-actions-row">
-        {direct_founder_email && (
-          <button 
+        {!isDmOnly && (
+          <a 
+            href={getEmailUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: 'none' }}
             className="icon-action-btn email" 
-            onClick={handleEmailAction}
             title={`Open Mail to ${direct_founder_email} (Hotkey: M)`}
           >
             ✉️ <span className="btn-lbl">Mail</span>
             <kbd className="shortcut-cap">M</kbd>
-          </button>
+          </a>
         )}
 
         {instagram_profile_url && (
-          <button 
-            className="icon-action-btn ig" 
-            onClick={() => handleDMAction(getInstagramDMUrl(), mobile_dm_pitch, 'Instagram')}
-            title="Copy DM & open Instagram chat window directly (Hotkey: I)"
-          >
-            📸 <span className="btn-lbl">IG DM</span>
-            <kbd className="shortcut-cap">I</kbd>
-          </button>
+          <>
+            <a 
+              href={isMobileDevice ? `https://ig.me/m/${getCleanHandle()}` : `https://www.instagram.com/${getCleanHandle()}/`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: 'none' }}
+              className="icon-action-btn ig" 
+              onClick={() => handleCopy(getDynamicPitch(lead, 'dm'), 'Instagram')}
+              title="Copy DM & open Instagram chat window directly (Hotkey: I)"
+            >
+              📸 <span className="btn-lbl">IG DM</span>
+              <kbd className="shortcut-cap">I</kbd>
+            </a>
+            {isMobileDevice && (
+              <a 
+                href={`instagram://user?username=${getCleanHandle()}`}
+                target="_self"
+                style={{ textDecoration: 'none', background: '#ff306c', color: 'white', marginLeft: '4px' }}
+                className="icon-action-btn" 
+                onClick={() => handleCopy(getDynamicPitch(lead, 'dm'), 'App Profile')}
+                title="Fallback: Open Profile directly in App"
+              >
+                👤
+              </a>
+            )}
+          </>
         )}
 
         {twitter_x_url && (
-          <button 
+          <a 
+            href={twitter_x_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: 'none' }}
             className="icon-action-btn x" 
-            onClick={() => handleDMAction(twitter_x_url, mobile_dm_pitch, 'Twitter/X')}
+            onClick={() => handleCopy(getDynamicPitch(lead, 'dm'), 'Twitter/X')}
             title="Copy DM & open Twitter/X (Hotkey: X)"
           >
             🐦 <span className="btn-lbl">X DM</span>
             <kbd className="shortcut-cap">X</kbd>
-          </button>
+          </a>
         )}
 
         {story_swipe_up_hook && instagram_profile_url && (
-          <button 
+          <a 
+            href={isMobileDevice ? `https://ig.me/m/${getCleanHandle()}` : `https://www.instagram.com/${getCleanHandle()}/`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: 'none' }}
             className="icon-action-btn story" 
-            onClick={() => handleDMAction(getInstagramDMUrl(), story_swipe_up_hook, 'Story Reply')}
-            title="Copy swipe hook & open Instagram chat window directly (Hotkey: S)"
+            onClick={() => handleCopy(story_swipe_up_hook, 'Story Reply')}
+            title="Copy Story Reply & open IG (Hotkey: S)"
           >
-            📲 <span className="btn-lbl">Swipe</span>
+            🚀 <span className="btn-lbl">Story Reply</span>
             <kbd className="shortcut-cap">S</kbd>
-          </button>
+          </a>
         )}
       </div>
 
@@ -294,9 +349,9 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
             <div className="pitch-preview-box">
               <div className="pitch-preview-header">
                 <span>Active DM Pitch Script</span>
-                <button onClick={() => handleCopy(mobile_dm_pitch, 'DM Copy')}>Copy</button>
+                <button onClick={() => handleCopy(getDynamicPitch(lead, 'dm'), 'DM Copy')}>Copy</button>
               </div>
-              <pre className="pitch-pre-text">{mobile_dm_pitch}</pre>
+              <pre className="pitch-pre-text">{getDynamicPitch(lead, 'dm')}</pre>
             </div>
           </div>
         )}

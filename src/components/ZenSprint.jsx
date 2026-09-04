@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getDynamicPitch } from '../utils/pitchHelper';
+
+const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
 // Synthesize modern success chime using Web Audio API + trigger haptics
 const playSuccessSound = (volume = 0.5) => {
@@ -201,32 +204,45 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
     return () => clearInterval(interval);
   }, [currentIndex, subStep]);
 
-  // Helper to construct ig.me direct DM links
-  const getInstagramDMUrl = (handle, profileUrl) => {
-    if (!handle) return profileUrl;
-    const username = handle.replace('@', '').trim().split('/')[0];
-    return `https://ig.me/m/${username}`;
+  // Helper to extract clean handle
+  const getCleanHandle = (handle, profileUrl) => {
+    let raw = handle || profileUrl || '';
+    raw = raw.replace(/^(?:https?:\/\/)?(?:www\.)?instagram\.com\//i, '');
+    raw = raw.replace(/^(?:https?:\/\/)?(?:www\.)?ig\.me\/m\//i, '');
+    raw = raw.replace(/@/g, '');
+    return raw.split('/')[0].split('?')[0].trim().replace(/\s+/g, '');
+  };
+
+  const getEmailUrl = (email, subjectLine, bodyPitch) => {
+    const subject = encodeURIComponent(subjectLine || 'quick question');
+    const body = encodeURIComponent(bodyPitch || '');
+    return `mailto:${email}?subject=${subject}&body=${body}`;
+  };
+
+  const fallbackExecCopy = (text) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.top = '-9999px';
+    textArea.style.left = '-9999px';
+    textArea.setAttribute('readonly', '');
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try { document.execCommand('copy'); } catch (err) {}
+    document.body.removeChild(textArea);
   };
 
   const handleCopy = (text, label) => {
-    navigator.clipboard.writeText(text);
+    if (!text) return;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).catch(() => fallbackExecCopy(text));
+    } else {
+      fallbackExecCopy(text);
+    }
     setCopyText(label);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
-  };
-
-  const handleDMAction = (url, pitchText) => {
-    if (!url) return;
-    handleCopy(pitchText, "Instagram Pitch");
-    window.open(url, '_blank');
-  };
-
-  const handleEmailAction = (email, subjectLine, bodyPitch) => {
-    if (!email) return;
-    const subject = encodeURIComponent(subjectLine || 'quick question');
-    const body = encodeURIComponent(bodyPitch || '');
-    handleCopy(bodyPitch, "Email Pitch");
-    window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
   };
 
   // Dual-channel sequencing trigger
@@ -269,19 +285,17 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
     launchRef.current = true;
     
     if (subStep === 1) {
-      const igUrl = getInstagramDMUrl(activeLead.raw_instagram_handle, activeLead.instagram_profile_url);
-      if (igUrl) {
-        handleDMAction(igUrl, activeLead.mobile_dm_pitch);
+      const cleanHandle = getCleanHandle(activeLead.raw_instagram_handle, activeLead.instagram_profile_url);
+      if (cleanHandle) {
+        handleCopy(getDynamicPitch(activeLead, 'dm'), 'Instagram Pitch');
+        window.open(isMobileDevice ? `https://ig.me/m/${cleanHandle}` : `https://www.instagram.com/${cleanHandle}/`, '_blank');
       } else {
-        // Fallback to Email immediately if no IG
         setSubStep(2);
       }
     } else {
-      if (activeLead.direct_founder_email) {
-        handleEmailAction(activeLead.direct_founder_email, activeLead.email_subject_line, activeLead.email_body_pitch);
-      } else {
-        executeDone();
-      }
+      const emailData = getDynamicPitch(activeLead, 'email');
+      handleCopy(emailData.body, 'Email Pitch');
+      window.open(getEmailUrl(activeLead.direct_founder_email, emailData.subject, emailData.body), '_blank');
     }
   };
 
@@ -289,21 +303,22 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
   useEffect(() => {
     const handleFocus = () => {
       if (!activeLead || !launchRef.current) return;
+      const isDmOnly = !activeLead.direct_founder_email || activeLead.direct_founder_email.toLowerCase().includes('dm');
       
       // User just returned from sending!
       if (subStep === 1) {
-        // If lead has an email, move to Step 2 (Email)
-        if (activeLead.direct_founder_email) {
+        if (!isDmOnly) {
           setSubStep(2);
           launchRef.current = false;
           if (autoLaunch) {
             setTimeout(() => {
-              handleEmailAction(activeLead.direct_founder_email, activeLead.email_subject_line, activeLead.email_body_pitch);
+              const emailData = getDynamicPitch(activeLead, 'email');
+              window.open(getEmailUrl(activeLead.direct_founder_email, emailData.subject, emailData.body), '_blank');
               launchRef.current = true;
             }, 600);
           }
         } else {
-          // No email, outreach complete!
+          // If DM only, we're done!
           executeDone();
         }
       } else if (subStep === 2) {
@@ -461,11 +476,17 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
           <span>Lead <strong>{currentIndex + 1}</strong> of <strong>{sprintLeads.length}</strong></span>
         </div>
 
-        {/* Dynamic Step Flow Visual Indicator */}
+        {/* Dynamic Dual-Step Indicator for the active sprint */}
         <div className="dual-step-indicator">
-          <span className={`step-badge ${subStep === 1 ? 'active' : 'done'}`}>Step 1: 📸 IG DM</span>
-          <span className="arrow-sep">➔</span>
-          <span className={`step-badge ${subStep === 2 ? 'active' : ''} ${!activeLead.direct_founder_email ? 'disabled' : ''}`}>Step 2: ✉️ Email</span>
+          {(!activeLead.direct_founder_email || activeLead.direct_founder_email.toLowerCase().includes('dm')) ? (
+            <span className="step-badge active">Step 1: 📸 IG DM Only</span>
+          ) : (
+            <>
+              <span className={`step-badge ${subStep === 1 ? 'active' : 'done'}`}>Step 1: 📸 IG DM</span>
+              <span className="arrow-sep">➔</span>
+              <span className={`step-badge ${subStep === 2 ? 'active' : ''}`}>Step 2: ✉️ Email</span>
+            </>
+          )}
         </div>
 
         {/* Volumetric Audio Slider & Auto-Launch controls */}
@@ -527,27 +548,58 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
             {/* Primary Action Sequence Buttons */}
             <div className="zen-mobile-controls stacked">
               {subStep === 1 ? (
-                <button 
-                  className="zen-action-btn primary" 
-                  onClick={executeStepLaunch}
-                >
-                  <span className="btn-icon">📲</span>
-                  <div className="btn-text-container">
-                    <strong>Copy & Open Instagram DM</strong>
-                    <small>Step 1 &bull; Press Space (Desktop)</small>
-                  </div>
-                </button>
+                <>
+                  <a 
+                    href={isMobileDevice ? `https://ig.me/m/${getCleanHandle(activeLead.raw_instagram_handle, activeLead.instagram_profile_url)}` : `https://www.instagram.com/${getCleanHandle(activeLead.raw_instagram_handle, activeLead.instagram_profile_url)}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ textDecoration: 'none', flex: 1 }}
+                    className="zen-action-btn primary" 
+                    onClick={() => {
+                      handleCopy(getDynamicPitch(activeLead, 'dm'), 'Instagram Pitch');
+                      launchRef.current = true;
+                    }}
+                  >
+                    <span className="btn-icon">📲</span>
+                    <div className="btn-text-container">
+                      <strong>Copy & Open Instagram DM</strong>
+                      <small>Step 1 &bull; Press Space (Desktop)</small>
+                    </div>
+                  </a>
+                  {isMobileDevice && getCleanHandle(activeLead.raw_instagram_handle, activeLead.instagram_profile_url) && (
+                    <a 
+                      href={`instagram://user?username=${getCleanHandle(activeLead.raw_instagram_handle, activeLead.instagram_profile_url)}`}
+                      target="_self"
+                      className="zen-action-btn"
+                      style={{ textDecoration: 'none', background: '#e1306c', color: 'white', flex: '0 0 auto', padding: '0 20px', marginLeft: '10px' }}
+                      onClick={() => {
+                        handleCopy(getDynamicPitch(activeLead, 'dm'), 'App Profile');
+                        launchRef.current = true;
+                      }}
+                      title="Fallback: Open Profile directly in App"
+                    >
+                      <span className="btn-icon" style={{ margin: 0 }}>👤</span>
+                    </a>
+                  )}
+                </>
               ) : (
-                <button 
-                  className="zen-action-btn mail-blue" 
-                  onClick={executeStepLaunch}
+                <a 
+                  href={(!activeLead.direct_founder_email || activeLead.direct_founder_email.toLowerCase().includes('dm')) ? '#' : getEmailUrl(activeLead.direct_founder_email, getDynamicPitch(activeLead, 'email').subject, getDynamicPitch(activeLead, 'email').body)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ textDecoration: 'none' }}
+                  className="zen-action-btn secondary" 
+                  onClick={() => {
+                    handleCopy(getDynamicPitch(activeLead, 'email').body, 'Email Pitch');
+                    launchRef.current = true;
+                  }}
                 >
                   <span className="btn-icon">✉️</span>
                   <div className="btn-text-container">
-                    <strong>Copy & Draft Direct Email</strong>
-                    <small>Step 2 &bull; Press Space (Desktop)</small>
+                    <strong>Launch Auto-Email</strong>
+                    <small>Step 2 &bull; Press Space</small>
                   </div>
-                </button>
+                </a>
               )}
 
               <button className="zen-action-btn success" onClick={executeDone}>
@@ -590,18 +642,18 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
               {/* Floating Copyable Bubble */}
               <button 
                 className="floating-copy-bubble"
-                onClick={() => handleCopy(subStep === 1 ? activeLead.mobile_dm_pitch : activeLead.email_body_pitch, 'Pitch')}
+                onClick={() => handleCopy(subStep === 1 ? getDynamicPitch(activeLead, 'dm') : getDynamicPitch(activeLead, 'email').body, 'Pitch')}
                 title="Copy current pitch text"
               >
                 📋 Re-Copy
               </button>
             </div>
-            {subStep === 2 && activeLead.email_subject_line && (
+            {subStep === 2 && getDynamicPitch(activeLead, 'email').subject && (
               <div className="email-subject-preview">
-                <strong>Subject:</strong> {activeLead.email_subject_line}
+                <strong>Subject:</strong> {getDynamicPitch(activeLead, 'email').subject}
               </div>
             )}
-            <pre className="pitch-pre-text">{subStep === 1 ? activeLead.mobile_dm_pitch : activeLead.email_body_pitch}</pre>
+            <pre className="pitch-pre-text">{subStep === 1 ? getDynamicPitch(activeLead, 'dm') : getDynamicPitch(activeLead, 'email').body}</pre>
           </div>
         </div>
 

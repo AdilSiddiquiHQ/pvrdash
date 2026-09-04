@@ -227,3 +227,26 @@ function handleClearSheet() {
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
+
+function handleClearSheet() {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Master Outreach CRM") || SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var lastRow = sheet.getLastRow();
+    
+    if (lastRow > 1) {
+      sheet.deleteRows(2, lastRow - 1);
+    }
+    
+    var response = JSON.stringify({ 
+      status: "success", 
+      message: "Successfully deleted all leads! Sheet is now completely fresh and empty." 
+    });
+    
+    return ContentService.createTextOutput(response)
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
