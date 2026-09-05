@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getDynamicPitch } from '../utils/pitchHelper';
+import { getDynamicPitch, getInstagramUrl } from '../utils/pitchHelper';
 
 const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
@@ -204,14 +204,7 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
     return () => clearInterval(interval);
   }, [currentIndex, subStep]);
 
-  // Helper to extract clean handle
-  const getCleanHandle = (handle, profileUrl) => {
-    let raw = handle || profileUrl || '';
-    raw = raw.replace(/^(?:https?:\/\/)?(?:www\.)?instagram\.com\//i, '');
-    raw = raw.replace(/^(?:https?:\/\/)?(?:www\.)?ig\.me\/m\//i, '');
-    raw = raw.replace(/@/g, '');
-    return raw.split('/')[0].split('?')[0].trim().replace(/\s+/g, '');
-  };
+  const activeIg = activeLead ? getInstagramUrl(activeLead.raw_instagram_handle, activeLead.instagram_profile_url) : { url: '', clean: '' };
 
   const getEmailUrl = (email, subjectLine, bodyPitch) => {
     const subject = encodeURIComponent(subjectLine || 'quick question');
@@ -285,10 +278,9 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
     launchRef.current = true;
     
     if (subStep === 1) {
-      const cleanHandle = getCleanHandle(activeLead.raw_instagram_handle, activeLead.instagram_profile_url);
-      if (cleanHandle) {
+      if (activeIg.url) {
         handleCopy(getDynamicPitch(activeLead, 'dm'), 'Instagram Pitch');
-        window.open(`https://www.instagram.com/${cleanHandle}/`, '_blank');
+        window.open(activeIg.url, isMobileDevice ? '_self' : '_blank');
       } else {
         setSubStep(2);
       }
@@ -547,23 +539,37 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
             {/* Primary Action Sequence Buttons */}
             <div className="zen-mobile-controls stacked">
               {subStep === 1 ? (
-                <a 
-                  href={`https://www.instagram.com/${getCleanHandle(activeLead.raw_instagram_handle, activeLead.instagram_profile_url)}/`}
-                  target={isMobileDevice ? "_self" : "_blank"}
-                  rel="noopener noreferrer"
-                  style={{ textDecoration: 'none', flex: 1 }}
-                  className="zen-action-btn primary" 
-                  onClick={() => {
-                    handleCopy(getDynamicPitch(activeLead, 'dm'), 'Instagram Pitch');
-                    launchRef.current = true;
-                  }}
-                >
-                  <span className="btn-icon">📲</span>
-                  <div className="btn-text-container">
-                    <strong>Copy & Open Instagram DM</strong>
-                    <small>Step 1 &bull; Press Space (Desktop)</small>
-                  </div>
-                </a>
+                activeIg.clean ? (
+                  <a 
+                    href={activeIg.url}
+                    target={isMobileDevice ? "_self" : "_blank"}
+                    rel="noopener noreferrer"
+                    style={{ textDecoration: 'none', flex: 1 }}
+                    className="zen-action-btn primary" 
+                    onClick={() => {
+                      handleCopy(getDynamicPitch(activeLead, 'dm'), 'Instagram Pitch');
+                      launchRef.current = true;
+                    }}
+                  >
+                    <span className="btn-icon">📲</span>
+                    <div className="btn-text-container">
+                      <strong>Copy & Open IG (@{activeIg.clean})</strong>
+                      <small>Step 1 &bull; Press Space (Desktop)</small>
+                    </div>
+                  </a>
+                ) : (
+                  <button 
+                    className="zen-action-btn secondary"
+                    style={{ opacity: 0.8, flex: 1 }}
+                    onClick={() => setSubStep(2)}
+                  >
+                    <span className="btn-icon">⚠️</span>
+                    <div className="btn-text-container">
+                      <strong>No Valid IG (Click for Step 2)</strong>
+                      <small>Skip to Email Step</small>
+                    </div>
+                  </button>
+                )
               ) : (
                 <a 
                   href={(!activeLead.direct_founder_email || activeLead.direct_founder_email.toLowerCase().includes('dm')) ? '#' : getEmailUrl(activeLead.direct_founder_email, getDynamicPitch(activeLead, 'email').subject, getDynamicPitch(activeLead, 'email').body)}

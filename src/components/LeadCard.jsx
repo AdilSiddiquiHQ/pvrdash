@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getDynamicPitch } from '../utils/pitchHelper';
+import { getDynamicPitch, getInstagramUrl } from '../utils/pitchHelper';
 
 const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
@@ -75,14 +75,7 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
 
   const isDmOnly = !direct_founder_email || direct_founder_email.toLowerCase().includes('dm');
 
-  // Helper to extract clean handle
-  const getCleanHandle = () => {
-    let raw = raw_instagram_handle || instagram_profile_url || '';
-    raw = raw.replace(/^(?:https?:\/\/)?(?:www\.)?instagram\.com\//i, '');
-    raw = raw.replace(/^(?:https?:\/\/)?(?:www\.)?ig\.me\/m\//i, '');
-    raw = raw.replace(/@/g, '');
-    return raw.split('/')[0].split('?')[0].trim().replace(/\s+/g, '');
-  };
+  const { url: igTargetUrl, clean: cleanIgHandle } = getInstagramUrl(raw_instagram_handle, instagram_profile_url);
 
   const fallbackExecCopy = (text) => {
     const textArea = document.createElement('textarea');
@@ -150,18 +143,26 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
       if (key === 'm' && !isDmOnly) {
         e.preventDefault();
         window.open(getEmailUrl(), '_blank');
-      } else if (key === 'i' && instagram_profile_url) {
+      } else if (key === 'i') {
         e.preventDefault();
+        if (!igTargetUrl) {
+          alert('⚠️ No valid Instagram handle found for this lead.');
+          return;
+        }
         handleCopy(getDynamicPitch(lead, 'dm'), 'Instagram Pitch');
-        window.open(`https://www.instagram.com/${getCleanHandle()}/`, '_blank');
+        window.open(igTargetUrl, isMobileDevice ? '_self' : '_blank');
       } else if (key === 'x' && twitter_x_url) {
         e.preventDefault();
         handleCopy(getDynamicPitch(lead, 'dm'), 'Twitter/X Pitch');
         window.open(twitter_x_url, '_blank');
-      } else if (key === 's' && story_swipe_up_hook && instagram_profile_url) {
+      } else if (key === 's' && story_swipe_up_hook) {
         e.preventDefault();
+        if (!igTargetUrl) {
+          alert('⚠️ No valid Instagram handle found for this lead.');
+          return;
+        }
         handleCopy(story_swipe_up_hook, 'Story Reply');
-        window.open(`https://www.instagram.com/${getCleanHandle()}/`, '_blank');
+        window.open(igTargetUrl, isMobileDevice ? '_self' : '_blank');
       } else if (key === 'd' || key === 'enter') {
         if (nextStatus) {
           e.preventDefault();
@@ -250,19 +251,27 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
           </a>
         )}
 
-        {instagram_profile_url && (
+        {cleanIgHandle ? (
           <a 
-            href={`https://www.instagram.com/${getCleanHandle()}/`}
+            href={igTargetUrl}
             target={isMobileDevice ? "_self" : "_blank"}
             rel="noopener noreferrer"
             style={{ textDecoration: 'none' }}
             className="icon-action-btn ig" 
             onClick={() => handleCopy(getDynamicPitch(lead, 'dm'), 'Instagram')}
-            title="Copy DM & open Instagram profile (Hotkey: I)"
+            title={`Copy DM & open Instagram @${cleanIgHandle} (Hotkey: I)`}
           >
             📸 <span className="btn-lbl">IG DM</span>
             <kbd className="shortcut-cap">I</kbd>
           </a>
+        ) : (
+          <span 
+            className="icon-action-btn disabled" 
+            style={{ opacity: 0.4, cursor: 'not-allowed' }}
+            title="No valid IG handle for this lead"
+          >
+            🚫 <span className="btn-lbl">No IG</span>
+          </span>
         )}
 
         {twitter_x_url && (
@@ -280,15 +289,15 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
           </a>
         )}
 
-        {story_swipe_up_hook && instagram_profile_url && (
+        {story_swipe_up_hook && cleanIgHandle && (
           <a 
-            href={`https://www.instagram.com/${getCleanHandle()}/`}
+            href={igTargetUrl}
             target={isMobileDevice ? "_self" : "_blank"}
             rel="noopener noreferrer"
             style={{ textDecoration: 'none' }}
             className="icon-action-btn story" 
             onClick={() => handleCopy(story_swipe_up_hook, 'Story Reply')}
-            title="Copy Story Reply & open IG (Hotkey: S)"
+            title={`Copy Story Reply & open IG @${cleanIgHandle} (Hotkey: S)`}
           >
             🚀 <span className="btn-lbl">Story Reply</span>
             <kbd className="shortcut-cap">S</kbd>
