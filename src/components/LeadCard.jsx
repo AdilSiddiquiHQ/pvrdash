@@ -75,15 +75,15 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
 
   const isDmOnly = !direct_founder_email || direct_founder_email.toLowerCase().includes('dm');
 
-  const { url: igTargetUrl, clean: cleanIgHandle } = getInstagramUrl(raw_instagram_handle, instagram_profile_url);
+  const igUrl = getInstagramUrl(raw_instagram_handle, instagram_profile_url);
 
-  const openUrl = (targetUrl) => {
-    if (!targetUrl) return;
-    if (isMobileDevice) {
-      window.location.href = targetUrl;
-    } else {
-      window.open(targetUrl, '_blank');
+  const handleDMAction = (url, pitchText, type) => {
+    if (!url) {
+      alert('⚠️ No valid Instagram handle found for this lead.');
+      return;
     }
+    handleCopy(pitchText, `${type} Pitch`);
+    window.open(url, '_blank');
   };
 
   const fallbackExecCopy = (text) => {
@@ -151,27 +151,16 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
       
       if (key === 'm' && !isDmOnly) {
         e.preventDefault();
-        openUrl(getEmailUrl());
+        window.open(getEmailUrl(), '_blank');
       } else if (key === 'i') {
         e.preventDefault();
-        if (!igTargetUrl) {
-          alert('⚠️ No valid Instagram handle found for this lead.');
-          return;
-        }
-        handleCopy(getDynamicPitch(lead, 'dm'), 'Instagram Pitch');
-        openUrl(igTargetUrl);
+        handleDMAction(igUrl, getDynamicPitch(lead, 'dm'), 'Instagram');
       } else if (key === 'x' && twitter_x_url) {
         e.preventDefault();
-        handleCopy(getDynamicPitch(lead, 'dm'), 'Twitter/X Pitch');
-        openUrl(twitter_x_url);
+        handleDMAction(twitter_x_url, getDynamicPitch(lead, 'dm'), 'Twitter/X');
       } else if (key === 's' && story_swipe_up_hook) {
         e.preventDefault();
-        if (!igTargetUrl) {
-          alert('⚠️ No valid Instagram handle found for this lead.');
-          return;
-        }
-        handleCopy(story_swipe_up_hook, 'Story Reply');
-        openUrl(igTargetUrl);
+        handleDMAction(igUrl, story_swipe_up_hook, 'Story Reply');
       } else if (key === 'd' || key === 'enter') {
         if (nextStatus) {
           e.preventDefault();
@@ -260,15 +249,15 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
           </a>
         )}
 
-        {cleanIgHandle ? (
+        {igUrl ? (
           <a 
-            href={igTargetUrl}
-            target={isMobileDevice ? "_self" : "_blank"}
+            href={igUrl}
+            target="_blank"
             rel="noopener noreferrer"
             style={{ textDecoration: 'none' }}
             className="icon-action-btn ig" 
             onClick={() => handleCopy(getDynamicPitch(lead, 'dm'), 'Instagram')}
-            title={`Copy DM & open Instagram @${cleanIgHandle} (Hotkey: I)`}
+            title="Copy DM & open Instagram (Hotkey: I)"
           >
             📸 <span className="btn-lbl">IG DM</span>
             <kbd className="shortcut-cap">I</kbd>
@@ -298,15 +287,15 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
           </a>
         )}
 
-        {story_swipe_up_hook && cleanIgHandle && (
+        {story_swipe_up_hook && igUrl && (
           <a 
-            href={igTargetUrl}
-            target={isMobileDevice ? "_self" : "_blank"}
+            href={igUrl}
+            target="_blank"
             rel="noopener noreferrer"
             style={{ textDecoration: 'none' }}
             className="icon-action-btn story" 
             onClick={() => handleCopy(story_swipe_up_hook, 'Story Reply')}
-            title={`Copy Story Reply & open IG @${cleanIgHandle} (Hotkey: S)`}
+            title="Copy Story Reply & open IG (Hotkey: S)"
           >
             🚀 <span className="btn-lbl">Story Reply</span>
             <kbd className="shortcut-cap">S</kbd>

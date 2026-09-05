@@ -204,16 +204,7 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
     return () => clearInterval(interval);
   }, [currentIndex, subStep]);
 
-  const activeIg = activeLead ? getInstagramUrl(activeLead.raw_instagram_handle, activeLead.instagram_profile_url) : { url: '', clean: '' };
-
-  const openUrl = (targetUrl) => {
-    if (!targetUrl) return;
-    if (isMobileDevice) {
-      window.location.href = targetUrl;
-    } else {
-      window.open(targetUrl, '_blank');
-    }
-  };
+  const activeIgUrl = activeLead ? getInstagramUrl(activeLead.raw_instagram_handle, activeLead.instagram_profile_url) : '';
 
   const getEmailUrl = (email, subjectLine, bodyPitch) => {
     const subject = encodeURIComponent(subjectLine || 'quick question');
@@ -287,16 +278,16 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
     launchRef.current = true;
     
     if (subStep === 1) {
-      if (activeIg.url) {
+      if (activeIgUrl) {
         handleCopy(getDynamicPitch(activeLead, 'dm'), 'Instagram Pitch');
-        openUrl(activeIg.url);
+        window.open(activeIgUrl, '_blank');
       } else {
         setSubStep(2);
       }
     } else {
       const emailData = getDynamicPitch(activeLead, 'email');
       handleCopy(emailData.body, 'Email Pitch');
-      openUrl(getEmailUrl(activeLead.direct_founder_email, emailData.subject, emailData.body));
+      window.open(getEmailUrl(activeLead.direct_founder_email, emailData.subject, emailData.body), '_blank');
     }
   };
 
@@ -314,7 +305,7 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
           if (autoLaunch) {
             setTimeout(() => {
               const emailData = getDynamicPitch(activeLead, 'email');
-              openUrl(getEmailUrl(activeLead.direct_founder_email, emailData.subject, emailData.body));
+              window.open(getEmailUrl(activeLead.direct_founder_email, emailData.subject, emailData.body), '_blank');
               launchRef.current = true;
             }, 600);
           }
@@ -548,24 +539,17 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
             {/* Primary Action Sequence Buttons */}
             <div className="zen-mobile-controls stacked">
               {subStep === 1 ? (
-                activeIg.clean ? (
-                  <a 
-                    href={activeIg.url}
-                    target={isMobileDevice ? "_self" : "_blank"}
-                    rel="noopener noreferrer"
-                    style={{ textDecoration: 'none', flex: 1 }}
+                activeIgUrl ? (
+                  <button 
                     className="zen-action-btn primary" 
-                    onClick={() => {
-                      handleCopy(getDynamicPitch(activeLead, 'dm'), 'Instagram Pitch');
-                      launchRef.current = true;
-                    }}
+                    onClick={executeStepLaunch}
                   >
                     <span className="btn-icon">📲</span>
                     <div className="btn-text-container">
-                      <strong>Copy & Open IG (@{activeIg.clean})</strong>
-                      <small>Step 1 &bull; Press Space (Desktop)</small>
+                      <strong>Copy & Open Instagram DM</strong>
+                      <small>Step 1 &bull; Press Space</small>
                     </div>
-                  </a>
+                  </button>
                 ) : (
                   <button 
                     className="zen-action-btn secondary"
@@ -580,23 +564,16 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
                   </button>
                 )
               ) : (
-                <a 
-                  href={(!activeLead.direct_founder_email || activeLead.direct_founder_email.toLowerCase().includes('dm')) ? '#' : getEmailUrl(activeLead.direct_founder_email, getDynamicPitch(activeLead, 'email').subject, getDynamicPitch(activeLead, 'email').body)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ textDecoration: 'none' }}
+                <button 
                   className="zen-action-btn secondary" 
-                  onClick={() => {
-                    handleCopy(getDynamicPitch(activeLead, 'email').body, 'Email Pitch');
-                    launchRef.current = true;
-                  }}
+                  onClick={executeStepLaunch}
                 >
                   <span className="btn-icon">✉️</span>
                   <div className="btn-text-container">
                     <strong>Launch Auto-Email</strong>
                     <small>Step 2 &bull; Press Space</small>
                   </div>
-                </a>
+                </button>
               )}
 
               <button className="zen-action-btn success" onClick={executeDone}>

@@ -40,14 +40,23 @@ export const sanitizeInstagramHandle = (handle, profileUrl) => {
   return match ? match[0] : '';
 };
 
-export const getInstagramUrl = (handle, profileUrl) => {
-  const clean = sanitizeInstagramHandle(handle, profileUrl);
-  if (!clean) return { url: '', clean: '' };
+export const getCleanInstagramHandle = (handle, profileUrl) => {
+  let raw = handle || profileUrl || '';
+  if (!raw) return '';
+  raw = String(raw).trim().split('?')[0].split('#')[0];
+  raw = raw.replace(/^(?:https?:\/\/)?(?:www\.)?instagram\.com\//i, '');
+  raw = raw.replace(/^(?:https?:\/\/)?(?:www\.)?ig\.me\/m\//i, '');
+  raw = raw.replace(/@/g, '').trim();
+  const parts = raw.split('/').filter(Boolean);
+  const clean = parts[0] || '';
+  const invalid = ['n/a', 'na', 'none', 'null', 'undefined', 'not_found', 'direct', 'p', 'reels', 'stories', '-'];
+  if (!clean || invalid.includes(clean.toLowerCase())) return '';
+  return clean;
+};
 
-  return {
-    url: `https://www.instagram.com/${clean}/`,
-    clean
-  };
+export const getInstagramUrl = (handle, profileUrl) => {
+  const clean = getCleanInstagramHandle(handle, profileUrl);
+  return clean ? `https://www.instagram.com/${clean}/` : '';
 };
 
 export const getDynamicPitch = (lead, channel) => {
