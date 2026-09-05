@@ -288,7 +288,7 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
       const cleanHandle = getCleanHandle(activeLead.raw_instagram_handle, activeLead.instagram_profile_url);
       if (cleanHandle) {
         handleCopy(getDynamicPitch(activeLead, 'dm'), 'Instagram Pitch');
-        window.open(isMobileDevice ? `https://ig.me/m/${cleanHandle}` : `https://www.instagram.com/${cleanHandle}/`, '_blank');
+        window.open(`https://www.instagram.com/${cleanHandle}/`, '_blank');
       } else {
         setSubStep(2);
       }
@@ -547,40 +547,23 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
             {/* Primary Action Sequence Buttons */}
             <div className="zen-mobile-controls stacked">
               {subStep === 1 ? (
-                <>
-                  <a 
-                    href={isMobileDevice ? `https://ig.me/m/${getCleanHandle(activeLead.raw_instagram_handle, activeLead.instagram_profile_url)}` : `https://www.instagram.com/${getCleanHandle(activeLead.raw_instagram_handle, activeLead.instagram_profile_url)}/`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ textDecoration: 'none', flex: 1 }}
-                    className="zen-action-btn primary" 
-                    onClick={() => {
-                      handleCopy(getDynamicPitch(activeLead, 'dm'), 'Instagram Pitch');
-                      launchRef.current = true;
-                    }}
-                  >
-                    <span className="btn-icon">📲</span>
-                    <div className="btn-text-container">
-                      <strong>Copy & Open Instagram DM</strong>
-                      <small>Step 1 &bull; Press Space (Desktop)</small>
-                    </div>
-                  </a>
-                  {isMobileDevice && getCleanHandle(activeLead.raw_instagram_handle, activeLead.instagram_profile_url) && (
-                    <a 
-                      href={`instagram://user?username=${getCleanHandle(activeLead.raw_instagram_handle, activeLead.instagram_profile_url)}`}
-                      target="_self"
-                      className="zen-action-btn"
-                      style={{ textDecoration: 'none', background: '#e1306c', color: 'white', flex: '0 0 auto', padding: '0 20px', marginLeft: '10px' }}
-                      onClick={() => {
-                        handleCopy(getDynamicPitch(activeLead, 'dm'), 'App Profile');
-                        launchRef.current = true;
-                      }}
-                      title="Fallback: Open Profile directly in App"
-                    >
-                      <span className="btn-icon" style={{ margin: 0 }}>👤</span>
-                    </a>
-                  )}
-                </>
+                <a 
+                  href={`https://www.instagram.com/${getCleanHandle(activeLead.raw_instagram_handle, activeLead.instagram_profile_url)}/`}
+                  target={isMobileDevice ? "_self" : "_blank"}
+                  rel="noopener noreferrer"
+                  style={{ textDecoration: 'none', flex: 1 }}
+                  className="zen-action-btn primary" 
+                  onClick={() => {
+                    handleCopy(getDynamicPitch(activeLead, 'dm'), 'Instagram Pitch');
+                    launchRef.current = true;
+                  }}
+                >
+                  <span className="btn-icon">📲</span>
+                  <div className="btn-text-container">
+                    <strong>Copy & Open Instagram DM</strong>
+                    <small>Step 1 &bull; Press Space (Desktop)</small>
+                  </div>
+                </a>
               ) : (
                 <a 
                   href={(!activeLead.direct_founder_email || activeLead.direct_founder_email.toLowerCase().includes('dm')) ? '#' : getEmailUrl(activeLead.direct_founder_email, getDynamicPitch(activeLead, 'email').subject, getDynamicPitch(activeLead, 'email').body)}

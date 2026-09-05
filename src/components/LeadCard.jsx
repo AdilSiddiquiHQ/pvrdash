@@ -153,7 +153,7 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
       } else if (key === 'i' && instagram_profile_url) {
         e.preventDefault();
         handleCopy(getDynamicPitch(lead, 'dm'), 'Instagram Pitch');
-        window.open(isMobileDevice ? `https://ig.me/m/${getCleanHandle()}` : `https://www.instagram.com/${getCleanHandle()}/`, '_blank');
+        window.open(`https://www.instagram.com/${getCleanHandle()}/`, '_blank');
       } else if (key === 'x' && twitter_x_url) {
         e.preventDefault();
         handleCopy(getDynamicPitch(lead, 'dm'), 'Twitter/X Pitch');
@@ -161,7 +161,7 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
       } else if (key === 's' && story_swipe_up_hook && instagram_profile_url) {
         e.preventDefault();
         handleCopy(story_swipe_up_hook, 'Story Reply');
-        window.open(isMobileDevice ? `https://ig.me/m/${getCleanHandle()}` : `https://www.instagram.com/${getCleanHandle()}/`, '_blank');
+        window.open(`https://www.instagram.com/${getCleanHandle()}/`, '_blank');
       } else if (key === 'd' || key === 'enter') {
         if (nextStatus) {
           e.preventDefault();
@@ -251,32 +251,18 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
         )}
 
         {instagram_profile_url && (
-          <>
-            <a 
-              href={isMobileDevice ? `https://ig.me/m/${getCleanHandle()}` : `https://www.instagram.com/${getCleanHandle()}/`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ textDecoration: 'none' }}
-              className="icon-action-btn ig" 
-              onClick={() => handleCopy(getDynamicPitch(lead, 'dm'), 'Instagram')}
-              title="Copy DM & open Instagram chat window directly (Hotkey: I)"
-            >
-              📸 <span className="btn-lbl">IG DM</span>
-              <kbd className="shortcut-cap">I</kbd>
-            </a>
-            {isMobileDevice && (
-              <a 
-                href={`instagram://user?username=${getCleanHandle()}`}
-                target="_self"
-                style={{ textDecoration: 'none', background: '#ff306c', color: 'white', marginLeft: '4px' }}
-                className="icon-action-btn" 
-                onClick={() => handleCopy(getDynamicPitch(lead, 'dm'), 'App Profile')}
-                title="Fallback: Open Profile directly in App"
-              >
-                👤
-              </a>
-            )}
-          </>
+          <a 
+            href={`https://www.instagram.com/${getCleanHandle()}/`}
+            target={isMobileDevice ? "_self" : "_blank"}
+            rel="noopener noreferrer"
+            style={{ textDecoration: 'none' }}
+            className="icon-action-btn ig" 
+            onClick={() => handleCopy(getDynamicPitch(lead, 'dm'), 'Instagram')}
+            title="Copy DM & open Instagram profile (Hotkey: I)"
+          >
+            📸 <span className="btn-lbl">IG DM</span>
+            <kbd className="shortcut-cap">I</kbd>
+          </a>
         )}
 
         {twitter_x_url && (
@@ -296,8 +282,8 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
 
         {story_swipe_up_hook && instagram_profile_url && (
           <a 
-            href={isMobileDevice ? `https://ig.me/m/${getCleanHandle()}` : `https://www.instagram.com/${getCleanHandle()}/`}
-            target="_blank"
+            href={`https://www.instagram.com/${getCleanHandle()}/`}
+            target={isMobileDevice ? "_self" : "_blank"}
             rel="noopener noreferrer"
             style={{ textDecoration: 'none' }}
             className="icon-action-btn story" 
