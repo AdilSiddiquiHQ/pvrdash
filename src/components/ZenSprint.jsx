@@ -451,7 +451,6 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
   };
 
   const timezoneInfo = getLeadLocalTime(activeLead.direct_founder_email);
-  const igUrl = getInstagramDMUrl(activeLead.raw_instagram_handle, activeLead.instagram_profile_url);
 
   return (
     <div className="zen-sprint-container">
