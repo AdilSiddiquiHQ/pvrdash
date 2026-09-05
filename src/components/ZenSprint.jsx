@@ -206,6 +206,15 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
 
   const activeIg = activeLead ? getInstagramUrl(activeLead.raw_instagram_handle, activeLead.instagram_profile_url) : { url: '', clean: '' };
 
+  const openUrl = (targetUrl) => {
+    if (!targetUrl) return;
+    if (isMobileDevice) {
+      window.location.href = targetUrl;
+    } else {
+      window.open(targetUrl, '_blank');
+    }
+  };
+
   const getEmailUrl = (email, subjectLine, bodyPitch) => {
     const subject = encodeURIComponent(subjectLine || 'quick question');
     const body = encodeURIComponent(bodyPitch || '');
@@ -280,14 +289,14 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
     if (subStep === 1) {
       if (activeIg.url) {
         handleCopy(getDynamicPitch(activeLead, 'dm'), 'Instagram Pitch');
-        window.open(activeIg.url, isMobileDevice ? '_self' : '_blank');
+        openUrl(activeIg.url);
       } else {
         setSubStep(2);
       }
     } else {
       const emailData = getDynamicPitch(activeLead, 'email');
       handleCopy(emailData.body, 'Email Pitch');
-      window.open(getEmailUrl(activeLead.direct_founder_email, emailData.subject, emailData.body), '_blank');
+      openUrl(getEmailUrl(activeLead.direct_founder_email, emailData.subject, emailData.body));
     }
   };
 
@@ -305,7 +314,7 @@ export default function ZenSprint({ leads, activeFounder, onStatusUpdate, onClos
           if (autoLaunch) {
             setTimeout(() => {
               const emailData = getDynamicPitch(activeLead, 'email');
-              window.open(getEmailUrl(activeLead.direct_founder_email, emailData.subject, emailData.body), '_blank');
+              openUrl(getEmailUrl(activeLead.direct_founder_email, emailData.subject, emailData.body));
               launchRef.current = true;
             }, 600);
           }

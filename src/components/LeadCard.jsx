@@ -77,6 +77,15 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
 
   const { url: igTargetUrl, clean: cleanIgHandle } = getInstagramUrl(raw_instagram_handle, instagram_profile_url);
 
+  const openUrl = (targetUrl) => {
+    if (!targetUrl) return;
+    if (isMobileDevice) {
+      window.location.href = targetUrl;
+    } else {
+      window.open(targetUrl, '_blank');
+    }
+  };
+
   const fallbackExecCopy = (text) => {
     const textArea = document.createElement('textarea');
     textArea.value = text;
@@ -142,7 +151,7 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
       
       if (key === 'm' && !isDmOnly) {
         e.preventDefault();
-        window.open(getEmailUrl(), '_blank');
+        openUrl(getEmailUrl());
       } else if (key === 'i') {
         e.preventDefault();
         if (!igTargetUrl) {
@@ -150,11 +159,11 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
           return;
         }
         handleCopy(getDynamicPitch(lead, 'dm'), 'Instagram Pitch');
-        window.open(igTargetUrl, isMobileDevice ? '_self' : '_blank');
+        openUrl(igTargetUrl);
       } else if (key === 'x' && twitter_x_url) {
         e.preventDefault();
         handleCopy(getDynamicPitch(lead, 'dm'), 'Twitter/X Pitch');
-        window.open(twitter_x_url, '_blank');
+        openUrl(twitter_x_url);
       } else if (key === 's' && story_swipe_up_hook) {
         e.preventDefault();
         if (!igTargetUrl) {
@@ -162,7 +171,7 @@ export default function LeadCard({ lead, activeFounder, onStatusUpdate }) {
           return;
         }
         handleCopy(story_swipe_up_hook, 'Story Reply');
-        window.open(igTargetUrl, isMobileDevice ? '_self' : '_blank');
+        openUrl(igTargetUrl);
       } else if (key === 'd' || key === 'enter') {
         if (nextStatus) {
           e.preventDefault();

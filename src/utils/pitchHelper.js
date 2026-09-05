@@ -44,19 +44,10 @@ export const getInstagramUrl = (handle, profileUrl) => {
   const clean = sanitizeInstagramHandle(handle, profileUrl);
   if (!clean) return { url: '', clean: '' };
 
-  const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
-  
-  if (isAndroid) {
-    return {
-      url: `intent://instagram.com/_u/${clean}#Intent;package=com.instagram.android;scheme=https;end`,
-      clean
-    };
-  } else {
-    return {
-      url: `https://www.instagram.com/${clean}/`,
-      clean
-    };
-  }
+  return {
+    url: `https://www.instagram.com/${clean}/`,
+    clean
+  };
 };
 
 export const getDynamicPitch = (lead, channel) => {
